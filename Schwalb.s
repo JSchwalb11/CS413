@@ -26,6 +26,12 @@
 
 main:
 
+ldr r0, =startthumb + 1
+bx  r0
+.code 16 @Make all this code thumb mode. Will not exit back out. 
+startthumb:
+
+
 @*******************
 welcome_prompt:
 @*******************
@@ -56,7 +62,11 @@ userInput:
   ldr r1, =intInput             @ Have to reload r1 because it gets wiped out.
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
                                 @ it can be stored.
-  mov r5, r1                    @ move contents of r1 into r5
+  mov r7, r1                    @ move contents of r1 into r5
+
+  cmp r7, #0                    @ check if first operand is negative
+  blt invalidOperand            @ branch to invalidOperand routine
+  push {r7}                     @ push first integer to stack
 
   ldr r0, =opInputPattern       @ Setup to read in one char.
   ldr r1, =charInput            @ load r1 with the address of where the
@@ -69,6 +79,13 @@ userInput:
                                 @ it can be stored.
   mov r6, r1                    @ move contents of r1 into r6
 
+  cmp r6, #0x2F                 @ check if operand is greater than 0x2F
+  bgt invalidOperator           @ if greater than, branch to invalidOperator
+  cmp r6, #0x2A                 @ check if operand is less than 0x2A
+  blt invalidOperator           @ if less than, branch to invalidOperator
+  cmp r6, #0x2E                 @ check if operand equals 0x2E
+  beq invalidOperator           @ if equals, branch to invalidOperator
+
   ldr r0, =numInputPattern      @ Setup to read in one number.
   ldr r1, =intInput             @ load r1 with the address of where the
                                 @ input value will be stored.
@@ -79,21 +96,16 @@ userInput:
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
                                 @ it can be stored.
   mov r7, r1                    @ move contents of r1 into r7
-
-  cmp r5, #0                    @ check if first operand is negative
-  blt invalidOperand            @ branch to invalidOperand routine
+  
   cmp r7, #0                    @ check if second operand is negative
   blt invalidOperand            @ branch to invalidOperand routine
-
-  cmp r6, #0x2F                 @ check if operand is greater than 0x2F
-  bgt invalidOperator           @ if greater than, branch to invalidOperator
-  cmp r6, #0x2A                 @ check if operand is less than 0x2A
-  blt invalidOperator           @ if less than, branch to invalidOperator
-  cmp r6, #0x2E                 @ check if operand equals 0x2E
-  beq invalidOperator           @ if equals, branch to invalidOperator
-
+  
+  pop {r0}                      @ pop first operand from stack (for ordering purposes)
   push {r7}                     @ push second operand to stack
-  push {r5}                     @ push first operand to stack
+  push {r0}                     @ push first operand back to stack
+
+
+  
 
 @*******************
 determineOperation:
@@ -118,20 +130,19 @@ determineOperation:
 addition:
 @*******************
 
-  mov r8, #0                    @ clear for use as scratchpad
-  mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
+  mov r3, #0                    @ clear for use as scratchpad
+  pop {r4}                      @ first operand as stored on stack
+  pop {r5}                      @ second operand as stored on stack
 
-  adds r9, r10, r11             @ add r10, r11, store in r9. Update flags
+  adds r4, r4, r5             @ add r10, r11, store in r9. Update flags
 
   push {lr}                         @ push lr, preserving lr in case of overflow
   ldrvs r0, =overflowDetectedString @ if overflow, load r0 with overflow string
   blvs printf                       @ if overflow, call printf and return here
   pop {lr}                          @ pop lr, returning lr to original state
 
-  push {r9}                     @ push result
-  push {r8}                     @ push remainder 0
+  push {r4}                     @ push result
+  push {r3}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
@@ -140,33 +151,47 @@ subtraction:
 @*******************
   mov r8, #0                    @ clear for use as scratchpad
   mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
 
-  subs r9, r10, r11             @ sub r10-r11, store in r9 and update flags
+  mov r3, #0
+  pop {r4}                     @ first operand as stored on stack
+  pop {r5}                     @ second operand as stored on stack
+  
+  @pop {r10}                     @ first operand as stored on stack
+  @pop {r11}                     @ second operand as stored on stack
+  @subs r9, r10, r11             @ sub r10-r11, store in r9 and update flags
+
+  subs r4, r4, r5
 
   push {lr}                         @ push lr, preserving lr in case of overflow
   ldrvs r0, =overflowDetectedString @ if overflow, load r0 with overflow string
   blvs printf                       @ if overflow, call printf and return here
   pop {lr}                          @ pop lr, returning lr to original state
 
-  push {r9}                     @ push result
-  push {r8}                     @ push remainder 0
+  push {r4}                     @ push result
+  push {r3}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
 @*******************
 multiplication:
 @*******************
-  mov r7, #0                    @ clear for use as scratchpad
-  mov r8, #0                    @ clear for use as scratchpad
-  mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
+  @mov r7, #0                    @ clear for use as scratchpad
+  @mov r8, #0                    @ clear for use as scratchpad
+  @mov r9, #0                    @ clear for use as scratchpad
+  @pop {r10}                     @ first operand as stored on stack
+  @pop {r11}                     @ second operand as stored on stack
 
-  smull r8, r9, r10, r11        @ mul r10, r11, store in r8,r9 (64 bits)
+  mov r2, #0                    @ clear for use as scratchpad
+  mov r3, #0                    @ clear for use as scratchpad
+  mov r4, #0                    @ clear for use as scratchpad
+  pop {r5}
+  pop {r6}
 
-  cmp r9, r8, ASR #31           @ shift 31st bit across register, compare with
+
+  @smull r8, r9, r10, r11        @ mul r10, r11, store in r8,r9 (64 bits)
+  smull r3, r4, r5, r6        @ mul r5, r6, store in r3,r4 (64 bits)
+
+  cmp r3, r4, ASR #31           @ shift 31st bit across register, compare with
                                 @ higher order 32 bits in r9.If not equal, overflow has occured
 
   push {lr}                         @ push lr, preserving lr in case of overflow
@@ -174,47 +199,52 @@ multiplication:
   blne printf                       @ if overflow, call printf and return here
   pop {lr}                          @ pop lr, returning lr to original state
 
-  push {r8}                     @ push result
-  push {r7}                     @ push remainder 0
+  push {r3}                     @ push result
+  push {r2}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
 @*******************
 division:
 @*******************
-  mov r8, #0                    @ for use as scratchpad
-  mov r9, #0                    @ clear for use as quotient
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
+  @mov r8, #0                    @ for use as scratchpad
+  @mov r9, #0                    @ clear for use as quotient
+  @pop {r10}                     @ first operand as stored on stack
+  @pop {r11}                     @ second operand as stored on stack
 
-  cmp r11, #0                   @ check if the second operand is zero
+  mov r3, #0
+  mov r4, #0                    @ clear for use as quotient
+  pop {r5}                      @ first operand as stored on stack
+  pop {r6}                      @ second operand as stored on stack       
+
+  cmp r6, #0                   @ check if the second operand is zero
   beq divByZero                 @ if zero, raise divide by zero error
 
-  cmp r11, #1                   @ check if the second operand is one
+  cmp r6, #1                   @ check if the second operand is one
   beq done_l                    @ if zero, branch to done_l
 
-  cmp r10, r11                  @ check if the first operand is less than the second
+  cmp r5, r6                  @ check if the first operand is less than the second
   blt done                      @ if less than, branch to done
 
 
 loop:
-  sub r10, r10, r11             @ r10-r11, store in r10
-  add r9, r9, #1                @ add one to quotient
-  cmp r10, #0                   @ compare divisor to zero
+  sub r5, r5, r6             @ r10-r11, store in r10
+  add r4, r4, #1                @ add one to quotient
+  cmp r5, #0                   @ compare divisor to zero
   bgt loop                      @ if greater than, branch to loop
   beq done                      @ if equal, branch to done
 
-  addlt r10, r10, r11           @ if divisor is less than zero, revert last step.
+  addlt r5, r5, r6           @ if divisor is less than zero, revert last step.
                                 @ remainders are positive
-  sublt r9, r9, #1              @ revert last quotient increment
+  sublt r4, r4, #1              @ revert last quotient increment
 done:
-  push {r9}                     @ push quotient
-  push {r10}                    @ push remainder
+  push {r4}                     @ push quotient
+  push {r5}                    @ push remainder
   mov pc, lr                    @ return from subroutine
 
 done_l:
-  push {r10}                    @ push quotient
-  push {r9}                     @ push remainder
+  push {r5}                    @ push quotient
+  push {r4}                     @ push remainder
   mov pc, lr                    @ return from subroutine
 
 
