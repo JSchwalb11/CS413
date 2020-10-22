@@ -1,0 +1,11 @@
+# Makefile
+all: CS413_Schwalb_Lab1
+
+CS413_Schwalb_Lab5: CS413_Schwalb_Lab1.o
+	gcc -o -g $@ $+
+
+CS413_Schwalb_Lab1.o : CS413_Schwalb_Lab1.s
+	as -o $@ $<
+
+clean:
+	rm -vf CS413_Schwalb_Lab1 *.o
