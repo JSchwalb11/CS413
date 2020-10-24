@@ -1,0 +1,11 @@
+# Makefile
+all: Schwalb
+
+Schwalb: Schwalb_16bit_lab2.o
+	gcc -marm -o Schwalb_16bit_lab2 Schwalb_16bit_lab2.o
+
+Schwalb.o : Schwalb_16bit_lab2.s
+	as -o Schwalb_16bit_lab2.o Schwalb_16bit_lab2.s
+
+clean:
+	rm -vf Schwalb_16bit_lab2 *.o

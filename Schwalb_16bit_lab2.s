@@ -144,21 +144,20 @@ addition:
   pop {r4}                      @ first operand as stored on stack
   pop {r5}                      @ second operand as stored on stack
 
-  ldr r0, =overflowDetectedString @ if overflow, load r0 with overflow string
-
-  @push {lr}                         @ push lr, preserving lr in case of overflow
-
-  @ldr r1, =addition             @ load addition label into r1
-  @add r1, r1, #26              @ 13 * 2 byte instruction offset
-  @mov lr, r1                    @ load new memory address into link register
+  push {lr}                         @ push lr, preserving lr in case of overflow
+  ldr r0, =addition
+  add r0, r0, #26
+  mov lr, r0
 
   add r4, r4, r5                @ add r4, r5, store in r4. 
 
-  @it vs
-  @bvs printf                    @ if overflow, call printf and return here
+  it vs
+  bvs overflowDetected
+  it vc
+  bvc noOverflowDetected
 
-  @pop {r6}                      @ pop lr into r6
-  @mov lr, r6                    @ returning lr to original state
+  pop {r6}                      @ pop lr into r6
+  mov lr, r6                    @ returning lr to original state
 
   push {r4}                     @ push result
   push {r3}                     @ push remainder 0
@@ -318,6 +317,21 @@ overflowDetected:
   pop {r6}                      @ pop from stack into link register
   mov lr, r6
 
+  mov pc, lr
+
+@***********
+noOverflowDetected:
+@***********
+  push {lr}                     @ push link register to stack
+
+  ldr r0, =noOverflowDetectedString @ load r0 with nooverflowDetectedString string
+  bl printf                     @ call printf, return here
+
+  pop {r6}                      @ pop from stack into link register
+  mov lr, r6
+
+  mov pc, lr
+
 @***********
 invalidOperand:
 @***********
@@ -396,6 +410,9 @@ resultWithRemainder: .asciz "The result is %d remainder %d\n"
 
 .balign 4
 overflowDetectedString: .asciz "Overflow detected... Calculation is incorrect\n"
+
+.balign 4
+noOverflowDetectedString: .asciz "No overflow detected... Calculation is correct\n"
 
 .balign 4
 invalidOperandString: .asciz "Invalid operand entered, please follow the instructions.\n"
