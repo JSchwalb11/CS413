@@ -24,12 +24,6 @@
 
 main:
 
-ldr r0, =startthumb + 1
-bx  r0
-.code 16 @Make all this code thumb mode. Will not exit back out. 
-startthumb:
-
-
 @*******************
 welcome_prompt:
 @*******************
@@ -55,11 +49,9 @@ firstArray:
 
 loopArr1:
 
-   str r2, [r4]            @ store the counter in the element
-   add r4, r4, #4
+   str r2, [r4], #4            @ store the counter in the element
    add r2, r2, #1              @ increment counter
    cmp r2, #10                 @ compare counter with #11
-   it lt
    blt loopArr1                @ if < 10 loops, continue to loopArr1
 
 
@@ -73,13 +65,9 @@ secondArray:
    mov r5, #0                  @ set counter to zero for next array
 
 loopArr2:
-   ldr r0, =loopArr2
-   add r0, r0, #8
-   @add r0, r0, #16
-   mov lr, r0
-   b userInput                @ branch to userInput subroutine, return here after
-   str r1, [r4]            @ store contents returned from userInput into r4
-   add r4, r4, #4
+
+   bl userInput                @ branch to userInput subroutine, return here after
+   str r1, [r4], #4            @ store contents returned from userInput into r4
    @str r5, [r4], #4            @ store the counter in the element
    add r5, r5, #1              @ increment counter
    cmp r5, #10                 @ compare counter with #11
@@ -91,32 +79,20 @@ loopArr2:
 @*******************
 userInput:                     
 @*******************
-   
-   @stmfd sp!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
-   push {lr}
-   push {r4}
-   push {r3}
-   push {r2}
+   stmfd r13!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
 
    ldr r0, =numInputPattern    @ Setup to read in one number.
    ldr r1, =intInput           @ load r1 with the address of where the
                                @ input value will be stored. 
    bl  scanf                   @ scan the keyboard.
    cmp r0, #READERROR          @ Check for a read error.
-   it eq
    beq readerror               @ If there was a read error go handle it.  
    ldr r1, =intInput           @ Have to reload r1 because it gets wiped out. 
    ldr r1, [r1]                @ Read the contents of intInput and store in r1 so that
                                @ it can be stored.
 
-   pop {r2}
-   pop {r3}
-   pop {r4}
-   pop {r0}
-   mov lr, r0
-   
-   @ldmfd sp!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
-   mov pc, lr                 @ move lr to pc to step out of subroutine
+   ldmfd r13!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
+   mov pc, r14                 @ move lr to pc to step out of subroutine
 
    
 
@@ -126,29 +102,21 @@ thirdArray:
    ldr r4, =arr1               @ load r4 with the pointer to arr1
    ldr r5, =arr2               @ load r5 with the pointer to arr2
    ldr r6, =arr3               @ load r6 with the pointer to arr3
-   @mov r7, #0                  @ clear register, used for scratch
-   @mov r8, #0                  @ clear register, used for scratch
-   @mov r9, #0                  @ clear register, used for scratch
-   mov r0, #0                  @ replaces r7
-   mov r1, #0                  @ replaces r8
    mov r2, #0                  @ set counter to zero
-   mov r3, #0                  @ replaces r9
+   mov r7, #0                  @ clear register, used for scratch
+   mov r8, #0                  @ clear register, used for scratch
+   mov r9, #0                  @ clear register, used for scratch
  
 
 @*******************
 multArr1Arr2:
 @*******************   
    
-   ldr r0, [r4]            @ load r7 with arr1 element
-   add r4, r4, #4
-   ldr r1, [r5]            @ load r7 with arr2 element
-   add r5, r5, #4
-   @mul r3, r1, r0              @ multiply r8, r7 (contents of arr1,arr2), store in r9
-   mul r1, r1, r0
-   mov r3, r1
+   ldr r7, [r4], #4            @ load r7 with arr1 element
+   ldr r8, [r5], #4            @ load r7 with arr2 element
+   mul r9, r8, r7              @ multiply r8, r7 (contents of arr1,arr2), store in r9
 
-   str r3, [r6]            @ store multiplication results in arr3
-   add r6, r6, #4
+   str r9, [r6], #4            @ store multiplication results in arr3
    add r2, r2, #1              @ increment pointer
    cmp r2, #10                 @ compare counter with #10
    bne multArr1Arr2            @ if < 10 loops, continue to multArr1Arr2
@@ -187,36 +155,22 @@ wrapUp:
 @***********
 printArray:
 @***********
-   @stmfd r13!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
-   push {lr}
-   push {r4}
-   push {r3}
-   push {r2}
-
+   stmfd r13!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
    ldr r4, [sp, #16]           @ pull the array pointer from the stack (16 spots above sp)
    mov r5, #0                  @ loop counter, different for this subroutine because printf quashes r2
 
 printLoop:
 
    mov r1, r5                  @ move counter into r1 for printing
-   ldr r2, [r4]            @ load element in array into r2 for printing
-   add r4, #4
+   ldr r2, [r4], #4            @ load element in array into r2 for printing
    bl _printf                  @ call printf, return after
    
    add r5, r5, #1              @ increment pointer
    cmp r5, #10                 @ compare counter with #10
-   it ne
    bne printLoop               @ if < 10 loops, continue to printLoop
    
-   pop {r2}
-   pop {r3}
-   pop {r4}
-   pop {r0}
-   mov lr, r0
-
-   @ldmfd r13!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
-
-   mov pc, lr                 @ return from subroutine
+   ldmfd r13!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
+   mov pc, r14                 @ return from subroutine
 
 @***********
 _printf:
