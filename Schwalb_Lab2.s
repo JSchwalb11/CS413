@@ -1,10 +1,12 @@
-@ Filename :    Schwalb.s
+@ Filename :    Schwalb_Lab2.s
 @ Author   :    Joseph Schwalb
 @ Email    :    jds0099@uah.edu
 @ CS413-02 :    2020
 @ Purpose  :    ARM Lab 2: use the stack to pass parameters to and from
 @               their own defined subroutines/functions in ARM Assembly.
 @
+@               ARM Lab 3: Convert this lab to compile and work as expected
+@               in ARM thumb mode.
 @
 @ Use these commands to assemble, link, run and debug this program:
 @    as -o Schwalb_Lab2.o Schwalb_Lab2.s
@@ -25,6 +27,11 @@
 .global main @ Have to use main because of C library uses.
 
 main:
+
+ldr r0, =startthumb + 1
+bx  r0
+.code 16 @Make all this code thumb mode. Will not exit back out. 
+startthumb:
 
 @*******************
 welcome_prompt:
@@ -52,6 +59,7 @@ userInput:
                                 @ input value will be stored.
   bl  scanf                     @ scan the keyboard.
   cmp r0, #READERROR            @ Check for a read error.
+  it eq
   beq readerror                 @ If there was a read error go handle it.
   ldr r1, =intInput             @ Have to reload r1 because it gets wiped out.
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
@@ -63,6 +71,7 @@ userInput:
                                 @ input value will be stored.
   bl  scanf                     @ scan the keyboard.
   cmp r0, #CHAR_READERROR       @ Check for a read error.
+  it eq
   beq readerror                 @ If there was a read error go handle it.
   ldr r1, =charInput            @ Have to reload r1 because it gets wiped out.
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
@@ -74,6 +83,7 @@ userInput:
                                 @ input value will be stored.
   bl  scanf                     @ scan the keyboard.
   cmp r0, #READERROR            @ Check for a read error.
+  it eq
   beq readerror                 @ If there was a read error go handle it.
   ldr r1, =intInput             @ Have to reload r1 because it gets wiped out.
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
@@ -81,15 +91,20 @@ userInput:
   mov r7, r1                    @ move contents of r1 into r7
 
   cmp r5, #0                    @ check if first operand is negative
+  it lt
   blt invalidOperand            @ branch to invalidOperand routine
   cmp r7, #0                    @ check if second operand is negative
+  it lt
   blt invalidOperand            @ branch to invalidOperand routine
 
   cmp r6, #0x2F                 @ check if operand is greater than 0x2F
+  it gt
   bgt invalidOperator           @ if greater than, branch to invalidOperator
   cmp r6, #0x2A                 @ check if operand is less than 0x2A
+  it lt
   blt invalidOperator           @ if less than, branch to invalidOperator
   cmp r6, #0x2E                 @ check if operand equals 0x2E
+  it eq
   beq invalidOperator           @ if equals, branch to invalidOperator
 
   push {r7}                     @ push second operand to stack
@@ -99,17 +114,30 @@ userInput:
 determineOperation:
 @*******************
   @ Test operation type by ascii table lookup
+
+  @ link to previous location + 2 bytes offset * # of instructions since no conditional
+  @ branch/link avaliable in thumb. 
+
+  ldr r0, =determineOperation   @ set return address to the location at determineOperation
+  add r0, r0, #30               @ 15 instructions * 2 bytes each = 30 byte offset
+  mov lr, r0                    @ mov computed address to link register
+  @ the link register now points to the instruction "b wrapUpWithRemainder"
+
   cmp r6, #0x2A                 @ if operator equals *
-  bleq multiplication           @ branch to Multiplication subroutine, return here
+  it eq                         @ if equals psuedocode
+  beq multiplication            @ branch to Multiplication subroutine
 
   cmp r6, #0x2B                 @ if operator equals +
-  bleq addition                 @ branch to Addition subroutine, return here
+  it eq                         @ if equals psuedocode
+  beq addition                  @ branch to Addition subroutine
 
   cmp r6, #0x2D                 @ if operator equals -
-  bleq subtraction              @ branch to Subtraction subroutine, return here
+  it eq                         @ if equals psuedocode
+  beq subtraction               @ branch to Subtraction subroutine
 
   cmp r6, #0x2F                 @ if operator equals /
-  bleq division                 @ branch to Division subroutine, return here
+  it eq                         @ if equals psuedocode
+  beq division                  @ branch to Division subroutine
 
   b wrapUpWithRemainder         @ branch to wrapUpWithRemainder
 
@@ -117,121 +145,125 @@ determineOperation:
 @*******************
 addition:
 @*******************
+  mov r2, #0
+  mov r3, #0                    @ clear for use as scratchpad
+  pop {r4}                      @ first operand as stored on stack
+  pop {r5}                      @ second operand as stored on stack
 
-  mov r8, #0                    @ clear for use as scratchpad
-  mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
+  push {lr}                     @ push lr, preserving lr in case of overflow
+  
+  ldr r0, =addition             @ set return address to the location at addition
+  add r0, r0, #26               @ 13 instructions * 2 bytes each = 26 byte offset
+  mov lr, r0                    @ mov computed address to link register
 
-  adds r9, r10, r11             @ add r10, r11, store in r9. Update flags
+  add r4, r4, r5                @ add r4, r5, store in r4. 
 
-  push {lr}                         @ push lr, preserving lr in case of overflow
-  ldrvs r0, =overflowDetectedString @ if overflow, load r0 with overflow string
-  blvs printf                       @ if overflow, call printf and return here
-  pop {lr}                          @ pop lr, returning lr to original state
+  it vs                         @ if overflow psuedocode
+  bvs overflowDetected          @ branch if overflow to overflowDetected
+  it vc                         @ if no overflow psuedocode
+  bvc noOverflowDetected        @ branch if no overflow to noOverflowDetected
 
-  push {r9}                     @ push result
-  push {r8}                     @ push remainder 0
+  pop {r6}                      @ pop lr into r6
+  mov lr, r6                    @ returning lr to original state
+
+  push {r4}                     @ push result
+  push {r3}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
 @*******************
 subtraction:
 @*******************
-  mov r8, #0                    @ clear for use as scratchpad
-  mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
+  mov r3, #0                    @ clear r3 for use as scratchpad
+  pop {r4}                      @ first operand as stored on stack
+  pop {r5}                      @ second operand as stored on stack
 
-  subs r9, r10, r11             @ sub r10-r11, store in r9 and update flags
+  cmp r4, r5                    @ set flags for r4,r5
+  sub r4, r4, r5                @ subtract r4, r5, store in r4
 
-  push {lr}                         @ push lr, preserving lr in case of overflow
-  ldrvs r0, =overflowDetectedString @ if overflow, load r0 with overflow string
-  blvs printf                       @ if overflow, call printf and return here
-  pop {lr}                          @ pop lr, returning lr to original state
-
-  push {r9}                     @ push result
-  push {r8}                     @ push remainder 0
+  push {r4}                     @ push result
+  push {r3}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
 @*******************
 multiplication:
 @*******************
-  mov r7, #0                    @ clear for use as scratchpad
-  mov r8, #0                    @ clear for use as scratchpad
-  mov r9, #0                    @ clear for use as scratchpad
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
 
-  smull r8, r9, r10, r11        @ mul r10, r11, store in r8,r9 (64 bits)
+  mov r2, #0                    @ clear for use as scratchpad
+  mov r3, #0                    @ clear for use as scratchpad
+  mov r4, #0                    @ clear for use as scratchpad
+  pop {r5}                      @ first operand as stored on stack
+  pop {r6}                      @ second operand as stored on stack
 
-  cmp r9, r8, ASR #31           @ shift 31st bit across register, compare with
-                                @ higher order 32 bits in r9.If not equal, overflow has occured
+  mul r5, r5, r6                @ mul r5, r6, store in r5
 
-  push {lr}                         @ push lr, preserving lr in case of overflow
-  ldrne r0, =overflowDetectedString @ if overflow, load r0 with overflow string
-  blne printf                       @ if overflow, call printf and return here
-  pop {lr}                          @ pop lr, returning lr to original state
-
-  push {r8}                     @ push result
-  push {r7}                     @ push remainder 0
+  push {r5}                     @ push result
+  push {r3}                     @ push remainder 0
 
   mov pc, lr                    @ return from subroutine
 
 @*******************
 division:
 @*******************
-  mov r8, #0                    @ for use as scratchpad
-  mov r9, #0                    @ clear for use as quotient
-  pop {r10}                     @ first operand as stored on stack
-  pop {r11}                     @ second operand as stored on stack
 
-  cmp r11, #0                   @ check if the second operand is zero
+  mov r3, #0                    @ clear r3 for use as scratchpad
+  mov r4, #0                    @ clear r4 for use as scratchpad
+  pop {r5}                      @ first operand as stored on stack
+  pop {r6}                      @ second operand as stored on stack
+
+  cmp r6, #0                    @ check if the second operand is zero
+  it eq                         @ if equal psuedocode
   beq divByZero                 @ if zero, raise divide by zero error
 
-  cmp r11, #1                   @ check if the second operand is one
+  cmp r6, #1                    @ check if the second operand is one
+  it eq                         @ if equal psuedocode
   beq done_l                    @ if zero, branch to done_l
 
-  cmp r10, r11                  @ check if the first operand is less than the second
+  cmp r5, r6                    @ check if the first operand is less than the second
+  it lt                         @ if less than psuedocode
   blt done                      @ if less than, branch to done
 
 
 loop:
-  sub r10, r10, r11             @ r10-r11, store in r10
-  add r9, r9, #1                @ add one to quotient
-  cmp r10, #0                   @ compare divisor to zero
+  sub r5, r5, r6                @ r5-r6, store in r5
+  add r4, r4, #1                @ add one to quotient
+  cmp r5, #0                    @ compare divisor to zero
+  it gt                         @ if greater than psuedocode
   bgt loop                      @ if greater than, branch to loop
+  it eq                         @ if equal than psuedocode
   beq done                      @ if equal, branch to done
+  it lt                         @ if less than psuedocode
+  blt done_lt                   @ if less than, branch to done_lt
 
-  addlt r10, r10, r11           @ if divisor is less than zero, revert last step.
-                                @ remainders are positive
-  sublt r9, r9, #1              @ revert last quotient increment
+  
 done:
-  push {r9}                     @ push quotient
-  push {r10}                    @ push remainder
+  push {r4}                     @ push quotient
+  push {r5}                     @ push remainder
   mov pc, lr                    @ return from subroutine
 
 done_l:
-  push {r10}                    @ push quotient
-  push {r9}                     @ push remainder
+  push {r5}                     @ push quotient
+  push {r4}                     @ push remainder
   mov pc, lr                    @ return from subroutine
+
+done_lt:
+  add r5, r5, r6                @ undo last subtraction operation, yeilding proper remainder
+  sub r4, r4, #1                @ undo last quotient increment, yeilding proper quotient
+  b done                        @ branch to done
 
 
 @*******************
 wrapUpWithRemainder:
 @*******************
-
   pop {r4}                      @ remainder
   pop {r5}                      @ quotient
   ldr r0, =resultWithRemainder  @ load r0 with resultWithRemainder string
   mov r1, r5                    @ move quotient into r1 for printing
   mov r2, r4                    @ move remainder into r2 for printing
 
-  push {lr}                     @ preserve link register
   bl printf                     @ call printf, return here
-  pop {lr}                      @ pop preserved address from stack into lr
-
+ 
 @*******************
 continue:
 @*******************
@@ -243,18 +275,23 @@ continue:
                                 @ input value will be stored.
   bl  scanf                     @ scan the keyboard.
   cmp r0, #CHAR_READERROR       @ Check for a read error.
+  it eq
   beq readerror                 @ If there was a read error go handle it.
   ldr r1, =charInput            @ Have to reload r1 because it gets wiped out.
   ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
                                 @ it can be stored.
 
   cmp r1, #0x59                 @ compare to "Y"
-  beq main                      @ if equal, branch to main
+  it eq                         @ if equal peusdocode
+  beq welcome_prompt            @ if equal, branch to main
   cmp r1, #0x79                 @ compare to "y"
-  beq main                      @ if equal, branch to main
+  it eq                         @ if equal peusdocode
+  beq welcome_prompt            @ if equal, branch to main
   cmp r1, #0x6e                 @ compare to "N"
+  it eq                         @ if equal peusdocode
   beq myexit                    @ if equal, branch to myexit
   cmp r1, #0x4e                 @ compare to "n"
+  it eq                         @ if equal peusdocode
   beq myexit                    @ if equal, branch to myexit
 
 @***********
@@ -265,17 +302,33 @@ divByZero:
   bl printf                     @ call printf, return here
   ldr r0, =progRestart          @ load r0 with the progRestart string
   bl printf                     @ call printf, return here
-  b main                        @ branch to main
+  b welcome_prompt              @ branch to main
 
 @***********
 overflowDetected:
 @***********
-  push {lr}                     @ push link register to stack
+  push {lr}                       @ push link register to stack
 
   ldr r0, =overflowDetectedString @ load r0 with overflowDetectedString string
-  bl printf                     @ call printf, return here
+  bl printf                       @ call printf, return here
 
-  pop {lr}                      @ pop from stack into link register
+  pop {r6}                        @ pop from stack into link register
+  mov lr, r6                      @ mov r6 into lr  
+
+  mov pc, lr                      @ mov link register into pc
+
+@***********
+noOverflowDetected:
+@***********
+  push {lr}                         @ push link register to stack
+
+  ldr r0, =noOverflowDetectedString @ load r0 with nooverflowDetectedString string
+  bl printf                         @ call printf, return here
+
+  pop {r6}                        @ pop from stack into link register
+  mov lr, r6                      @ mov r6 into lr  
+
+  mov pc, lr                      @ mov link register into pc
 
 @***********
 invalidOperand:
@@ -284,7 +337,7 @@ invalidOperand:
   bl printf                     @ call printf, return here
   ldr r0, =progRestart          @ load r0 with the progRestart string
   bl printf                     @ call printf, return here
-  b main
+  b welcome_prompt              @ branch to welcome_prompt
 @*******************
 invalidOperator:
 @*******************
@@ -292,7 +345,7 @@ invalidOperator:
   bl printf                     @ call printf, return here
   ldr r0, =progRestart          @ load r0 with the progRestart string
   bl printf                     @ call printf, return here
-  b main                        @ branch to main
+  b welcome_prompt              @ branch to welcome_prompt
 
 @***********
 readerror:
@@ -355,6 +408,9 @@ resultWithRemainder: .asciz "The result is %d remainder %d\n"
 
 .balign 4
 overflowDetectedString: .asciz "Overflow detected... Calculation is incorrect\n"
+
+.balign 4
+noOverflowDetectedString: .asciz "No overflow detected... Calculation is correct\n"
 
 .balign 4
 invalidOperandString: .asciz "Invalid operand entered, please follow the instructions.\n"
