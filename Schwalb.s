@@ -1,16 +1,16 @@
-@ Filename :    CS413_Schwalb_Lab1.s
+@ Filename :    Schwalb.s
 @ Author   :    Joseph Schwalb
 @ Email    :    jds0099@uah.edu
 @ CS413-02 :    2020
-@ Purpose  :    ARM Lab 1: Use the ARM Auto-Indexing
-@               to access array elements and to do nested subroutine calls.
-@ 
+@ Purpose  :    ARM Lab 4: Simulate the operation of a coffee machine like Keurig.
+@               
+@         <SECRET CODE IS '9'>
 @
 @ Use these commands to assemble, link, run and debug this program:
-@    as -o CS413_Schwalb_Lab1.o CS413_Schwalb_Lab1.s
-@    gcc -o CS413_Schwalb_Lab1 CS413_Schwalb_Lab1.o
-@    ./CS413_Schwalb_Lab1 ;echo $?
-@    gdb --args ./CS413_Schwalb_Lab1
+@    as -o Schwalb.o Schwalb.s
+@    gcc -o Schwalb Schwalb.o
+@    ./Schwalb ;echo $?
+@    gdb --args ./Schwalb
 
 @ ***********************************************************************
 @ The = (equal sign) is used in the ARM Assembler to get the address of a
@@ -19,15 +19,11 @@
 @ ***********************************************************************
 
 .equ READERROR, 0 @Used to check for scanf read error.
+.equ CHAR_READERROR, 0 @Used to check for scanf read error.
 
 .global main @ Have to use main because of C library uses. 
 
 main:
-
-ldr r0, =startthumb + 1
-bx  r0
-.code 16 @Make all this code thumb mode. Will not exit back out. 
-startthumb:
 
 
 @*******************
@@ -36,198 +32,188 @@ welcome_prompt:
 
 @ Ask the user to enter a number.
  
-   ldr r0, =welcomeLab1    @ Put the address of my string into the first parameter
-   bl  printf              @ Call the C printf to display input prompt. 
+   ldr r0, =welcomeLab4    @ Put the address of my string into the first parameter
+   bl  printf              @ Call the C printf to display input prompt.
 
-@*******************
-writeArrays:
-@*******************
-
-   mov r2, #0                  @ loop counter
-   mov r3, #0                  @ index offset (4 byte words)
-   mov r4, #0                  @ arr
+   mov r2, #48             @ move 48 into r2
+   ldr r1, =waterLevel     @ load r1 with the address of waterLevel
+   str r2, [r1]            @ store r2 in the contents of r1
 
 
 @*******************
-firstArray:
+choose_coffee_size:
 @*******************
-   ldr r4, =arr1               @ load r1 with the address of our first array
+  
+  ldr r0, =choose_coffee_size_string  @ load r0 with the contents of choose_coffee_size_string
+  bl printf                           @ branch to printf, return here
 
-loopArr1:
+  ldr r0, =numInputPattern    @ Setup to read in one number.
+  ldr r1, =intInput           @ load r1 with the address of where the
+                              @ input value will be stored. 
+  bl  scanf                   @ scan the keyboard.
+  cmp r0, #READERROR          @ Check for a read error.
+  beq readerror               @ If there was a read error go handle it.  
+  ldr r1, =intInput           @ Have to reload r1 because it gets wiped out. 
+  ldr r1, [r1]                @ Read the contents of intInput and store in r1 so that
+                              @ it can be stored.
+  ldr r2, =coffeeSize         @ load r2 with the address of coffeeSize
+  str r1, [r2]                @ store r1 in the contents of r2
 
-   str r2, [r4]            @ store the counter in the element
-   add r4, r4, #4
-   add r2, r2, #1              @ increment counter
-   cmp r2, #10                 @ compare counter with #11
-   it lt
-   blt loopArr1                @ if < 10 loops, continue to loopArr1
+  cmp r1, #9                    @ compare r1 to secret code '9'
+  ldreq lr, =choose_coffee_size @ if equal, load link register with the address of choose_coffee_size
+  beq hidden_menu               @ if equal, branch to hidden menu
 
+  cmp r1, #'t'
+  beq myexit
 
-@*******************
-secondArray:
-@*******************
-   ldr r4, =arr2               @ load r4 with the pointer to the next array
-
-   ldr r0, =inputFormatStr     @ Put the address of my string into the first parameter
-   bl  printf                  @ Call the C printf to display input prompt.
-   mov r5, #0                  @ set counter to zero for next array
-
-loopArr2:
-   ldr r0, =loopArr2
-   add r0, r0, #8
-   @add r0, r0, #16
-   mov lr, r0
-   b userInput                @ branch to userInput subroutine, return here after
-   str r1, [r4]            @ store contents returned from userInput into r4
-   add r4, r4, #4
-   @str r5, [r4], #4            @ store the counter in the element
-   add r5, r5, #1              @ increment counter
-   cmp r5, #10                 @ compare counter with #11
-   blt loopArr2                @ if < 10 loops, continue to loopArr2
-   
-   b thirdArray                @ else branch to thirdArray
+  cmp r1, #'T'
+  beq myexit
 
 
 @*******************
-userInput:                     
+check_reservoir:
 @*******************
-   
-   @stmfd sp!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
-   push {lr}
-   push {r4}
-   push {r3}
-   push {r2}
+  ldr r1, =coffeeSize           @ load r1 with the address of coffeeSize
+  ldr r1, [r1]                  @ load r1 with the contents of r1
 
-   ldr r0, =numInputPattern    @ Setup to read in one number.
-   ldr r1, =intInput           @ load r1 with the address of where the
-                               @ input value will be stored. 
-   bl  scanf                   @ scan the keyboard.
-   cmp r0, #READERROR          @ Check for a read error.
-   it eq
-   beq readerror               @ If there was a read error go handle it.  
-   ldr r1, =intInput           @ Have to reload r1 because it gets wiped out. 
-   ldr r1, [r1]                @ Read the contents of intInput and store in r1 so that
-                               @ it can be stored.
+  ldr r2, =waterLevel           @ load r2 with the address of waterLevel
+  ldr r2, [r2]                  @ load r2 with the contents of r2
+  
+  cmp r1, #1                    @ check if small coffee
+  subeq r2, r2, #6              @ if equal, decrement water level by 6
+  cmp r2, #0                    @ check if water level is less than zero
+  blt refill_reservoir          @ if less than, branch to refill_reservoir
 
-   pop {r2}
-   pop {r3}
-   pop {r4}
-   pop {r0}
-   mov lr, r0
-   
-   @ldmfd sp!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
-   mov pc, lr                 @ move lr to pc to step out of subroutine
+  cmp r1, #2                    @ check if medium coffee
+  subeq r2, r2, #8              @ if equal, decrement water level by 8
+  cmp r2, #0                    @ check if water level is less than zero
+  blt choose_another_size       @ if less than, branch to refill_reservoir
 
-   
+  cmp r1, #3                    @ check if large coffee
+  subeq r2, r2, #10             @ if equal, decrement water level by 10
+  cmp r2, #0                    @ check if water level is less than zero
+  blt choose_another_size       @ if less than, branch to refill_reservoir
+
 
 @*******************
-thirdArray:
-@*******************   
-   ldr r4, =arr1               @ load r4 with the pointer to arr1
-   ldr r5, =arr2               @ load r5 with the pointer to arr2
-   ldr r6, =arr3               @ load r6 with the pointer to arr3
-   @mov r7, #0                  @ clear register, used for scratch
-   @mov r8, #0                  @ clear register, used for scratch
-   @mov r9, #0                  @ clear register, used for scratch
-   mov r0, #0                  @ replaces r7
-   mov r1, #0                  @ replaces r8
-   mov r2, #0                  @ set counter to zero
-   mov r3, #0                  @ replaces r9
- 
+brew:
+@*******************
+  
+  ldr r0, =ready_to_brew        @ Put the address of my string into the first parameter
+  bl  printf                    @ Call the C printf to display input prompt.
+  ldr r0, =opInputPattern       @ Setup to read in one char.
+  ldr r1, =charInput            @ load r1 with the address of where the
+                                @ input value will be stored.
+  bl  scanf                     @ scan the keyboard.
+  cmp r0, #CHAR_READERROR       @ Check for a read error.
+  beq readerror                 @ If there was a read error go handle it.
+  ldr r1, =charInput            @ Have to reload r1 because it gets wiped out.
+  ldr r1, [r1]                  @ Read the contents of intInput and store in r1 so that
+                                @ it can be stored.
+
+  cmp r1, #0x42                 @ Compare r1 with 'B'
+  beq begin_brewing             @ if equal, branch to begin_brewing
+  cmp r1, #0x62                 @ Compare r1 with 'b'
+  beq begin_brewing             @ if equal, branch to begin_brewing
+  
+  cmp r1, #'9'                  @ Compare r1 with secret code '9'
+  ldreq lr, =brew               @ if equal, load lr with address of brew
+  beq hidden_menu               @ if equal, branch to hidden menu
+
+  cmp r1, #'t'                  @ compare r1 to 't'
+  beq myexit                    @ if equal, branch to myexit
+
+  cmp r1, #'T'                  @ compare r1 to 'T'
+  beq myexit                    @ if equal, branch to myexit
+
+  bne brew                      @ if not equal, branch to brew
+
 
 @*******************
-multArr1Arr2:
-@*******************   
-   
-   ldr r0, [r4]            @ load r7 with arr1 element
-   add r4, r4, #4
-   ldr r1, [r5]            @ load r7 with arr2 element
-   add r5, r5, #4
-   @mul r3, r1, r0              @ multiply r8, r7 (contents of arr1,arr2), store in r9
-   mul r1, r1, r0
-   mov r3, r1
+begin_brewing:
+@*******************
 
-   str r3, [r6]            @ store multiplication results in arr3
-   add r6, r6, #4
-   add r2, r2, #1              @ increment pointer
-   cmp r2, #10                 @ compare counter with #10
-   bne multArr1Arr2            @ if < 10 loops, continue to multArr1Arr2
+  ldr r1, =coffeeSize           @ load r1 with the address of coffeeSize
+  ldr r1, [r1]                  @ load r1 with the contents of the address at coffeeSize
 
+  ldr r2, =waterLevel           @ load r2 with the address of waterLevel
+  ldr r2, [r2]                  @ load r2 with the contents of the address at waterLevel
 
-@*******************   
-wrapUp:
-@*******************   
-   ldr r0, =arr1String         @ load r0 with string for printing
-   bl printf                   @ branch to printf, return here after
+  cmp r1, #1                    @ check if small coffee selected
+  ldreq r4, =smallCoffeeCount   @ load r4 with address of smallCoffeeCount
+  ldreq r3, [r4]                @ load r3 with the contents of the address in r4
+  addeq r3, r3, #1              @ increment r3
+  streq r3, [r4]                @ store r3 in contents of r4
+  subeq r2, r2, #6              @ decrement r2 by 6 (waterLevel - coffeeSize )
+  
+  cmp r1, #2                    @ check if medium coffee selected
+  ldreq r4, =mediumCoffeeCount  @ load r4 with the address of mediumCoffeeCount
+  ldreq r3, [r4]                @ load r3 with the contents of r4
+  addeq r3, r3, #1              @ increment r3
+  streq r3, [r4]                @ store r3 in the contents of r4
+  subeq r2, r2, #8              @ decrement r2 by 8 (waterLevel - coffeeSize)
+  
+  cmp r1, #3                    @ check if large coffee selected
+  ldreq r4, =largeCoffeeCount   @ load r4 with the address of largeCoffeeCount
+  ldreq r3, [r4]                @ load r3 with the contents of r4
+  addeq r3, r3, #1              @ increment r3
+  streq r3, [r4]                @ store r3 in the contents of r4
+  subeq r2, r2, #10             @ decrement r2 by 10 (waterLevel - coffeeSize)
 
-   ldr r4, =arr1               @ load r4 with arr1
-   push {r4}                   @ push r4 to stack for use as parameter
-   bl printArray               @ branch with link to printArray
-   pop {r4}                    @ pop r4 from stack
+  ldr r1, =waterLevel           @ load r1 with the address of waterLevel
+  str r2, [r1]                  @ store r2 in the contents of r1
 
-   ldr r0, =arr2String         @ load r0 with string for printing
-   bl printf                   @ branch to printf, return here after
+  ldr r2, =coffeeSize           @ load r2 with the address of coffeeSize
+  str r1, [r2]                  @ store r1 in the contents of r2
 
-   ldr r4, =arr2               @ load r4 with arr2
-   push {r4}                   @ push r4 to stack for use as parameter
-   bl printArray               @ branch with link to printArray
-   pop {r4}                    @ pop r4 from stack
+  ldr r0, =successful_brew      @ load r0 with the address of successful_brew
+  bl printf                     @ branch to printf, return here
 
-   ldr r0, =arr3String         @ load r0 with string for printing
-   bl printf                   @ branch to printf, return here after
+  b choose_coffee_size          @ branch to choose_coffee_size
 
-   ldr r4, =arr3               @ load r4 with arr3
-   push {r4}                   @ push r4 to stack for use as parameter
-   bl printArray               @ branch with link to printArray
-   pop {r4}                    @ pop r4 from stack
+@*******************
+refill_reservoir:
+@*******************
 
-   b myexit                    @ branch to myexit
+  mov r3, #0                        @ clear r3
+  ldr r0, =refill_reservoir_string  @ load r0 with the address of refill_reservoir_string
+  bl printf                         @ branch to printf, return here
 
+  b myexit
 
-@***********
-printArray:
-@***********
-   @stmfd r13!, {r2-r4, lr}     @ store working registers {r2-r4, lr}
-   push {lr}
-   push {r4}
-   push {r3}
-   push {r2}
+@*******************
+choose_another_size:
+@*******************
+  ldr r0, =choose_another_size_string  @ load r0 with the address of choose_another_size_string
+  bl printf                            @ branch to printf, return here
 
-   ldr r4, [sp, #16]           @ pull the array pointer from the stack (16 spots above sp)
-   mov r5, #0                  @ loop counter, different for this subroutine because printf quashes r2
+  b choose_coffee_size                 @ branch to choose_coffee_size
 
-printLoop:
+@*******************
+hidden_menu:
+@*******************
 
-   mov r1, r5                  @ move counter into r1 for printing
-   ldr r2, [r4]            @ load element in array into r2 for printing
-   add r4, #4
-   bl _printf                  @ call printf, return after
-   
-   add r5, r5, #1              @ increment pointer
-   cmp r5, #10                 @ compare counter with #10
-   it ne
-   bne printLoop               @ if < 10 loops, continue to printLoop
-   
-   pop {r2}
-   pop {r3}
-   pop {r4}
-   pop {r0}
-   mov lr, r0
+  stmfd r13!, {r0-r3, lr}              @ store working registers and link register
 
-   @ldmfd r13!, {r2-r4, lr}     @ reload working registers from stack {r2-r4, lr}
+  ldr r0, =water_remaining_string      @ load r0 with the address of water_remaining_string
+  ldr r1, =waterLevel                  @ load r1 with the address of waterLevel
+  ldr r1, [r1]                         @ load r1 with the contents of r1
+  bl printf                            @ branch to printf, return here
 
-   mov pc, lr                 @ return from subroutine
+  ldr r0, =coffee_count_string         @ load r0 with the address of coffee_count_string
+  ldr r1, =smallCoffeeCount            @ load r1 with the address of smallCoffeeCount
+  ldr r2, =mediumCoffeeCount           @ load r2 with the address of mediumCoffeeCount
+  ldr r3, =largeCoffeeCount            @ load r3 with the address of largeCoffeeCount
 
-@***********
-_printf:
-@***********
+  ldr r1, [r1]                         @ load r1 with the contents of r1
+  ldr r2, [r2]                         @ load r2 with the contents of r2
+  ldr r3, [r3]                         @ load r3 with the contents of r3
+  bl printf                            @ branch to printf, return here
 
-    PUSH {LR}               @ store the return address
-    LDR R0, =printf_str     @ R0 contains formatted string address
-    BL printf               @ call printf
-    POP {PC}                @ restore the stack pointer and return
+  ldmfd r13!, {r0-r3, lr}              @ restore working registers and link register
 
-   
+  mov pc, lr                           @ move link register into program counter
+
 @***********
 readerror:
 @***********
@@ -259,31 +245,41 @@ myexit:
 
 @ Declare the strings and data needed
 
-
-arr1: .skip 40                 @ 4 bytes * 10 elements = 40 bytes
-arr2: .skip 40                 @ 4 bytes * 10 elements = 40 bytes
-arr3: .skip 40                 @ 4 bytes * 10 elements = 40 bytes
-
-.balign 4
-arr1String: .asciz "\nArray 1 contents:\n"
+waterLevel:        .skip 4
+coffeeSize:        .skip 4
+smallCoffeeCount:  .skip 4
+mediumCoffeeCount: .skip 4
+largeCoffeeCount:  .skip 4
 
 .balign 4
-arr2String: .asciz "\nArray 2 contents:\n"
+welcomeLab4: .asciz "Welcome to the Coffee Maker\nInsert K-cup and press B to begin making coffee.\nPress T to turn off the machine.\n"
 
 .balign 4
-arr3String: .asciz "\nArray 3 contents:\n"
+choose_coffee_size_string: .asciz "1. Small (6 oz)\n2. Medium (8 oz)\n3. Large (10 oz)\n<9. Hidden Menu>\n"
 
 .balign 4
-printf_str:     .asciz      "a[%d] = %d\n"
+choose_another_size_string: .asciz "Not enough water left for that size, please choose a smaller size.\n"
 
 .balign 4
-welcomeLab1: .asciz "Welcome to the Lab 1 program, please enter 10 positive numbers.\n"
+ready_to_brew: .asciz "Ready to Brew!\nPlease place a cup in the tray and press B to begin brewing.\n"
 
 .balign 4
-inputFormatStr: .asciz "Please enter each value followed by a carriage return.\n"
+successful_brew: .asciz "Done brewing, enjoy!\n"
+
+.balign 4
+refill_reservoir_string: .asciz "Please refill reservoir.\n"
+
+.balign 4
+water_remaining_string: .asciz "Water remaining: %d\n"
+
+.balign 4
+coffee_count_string: .asciz "Small Coffee Count: %d\nMedium Coffee Count: %d\nLarge Coffee Count: %d\n"
 
 .balign 4
 strInputPattern: .asciz "%[^\n]" @ Used to clear the input buffer for invalid input. 
+
+.balign 4
+opInputPattern: .asciz "%s"   @ character format for read
 
 .balign 4
 strInputError: .skip 100*4  @ User to clear the input buffer for invalid input. 
@@ -295,6 +291,9 @@ numInputPattern: .asciz "%d"  @ integer format for read.
 
 .balign 4
 intInput: .word 0   @ Location used to store the user input.
+
+.balign 4
+charInput: .word 0   @ Location used to store the user input.
 
 
 @ Let the assembler know these are the C library functions. 
